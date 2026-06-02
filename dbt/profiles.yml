@@ -1,0 +1,20 @@
+# dbt connection profile for local runs (CLI and the Airflow BashOperator DAG).
+# Credentials are reused from the existing dlt Snowflake env vars in .env, so
+# there is a single source of truth for Snowflake access.
+#
+# dlt's HOST is the Snowflake account identifier (<org>-<account>), which is
+# exactly what dbt's `account` field expects. Confirm with `dbt debug`.
+nyc311:
+  target: prod
+  outputs:
+    prod:
+      type: snowflake
+      account: "{{ env_var('DESTINATION__SNOWFLAKE__CREDENTIALS__HOST') }}"
+      user: "{{ env_var('DESTINATION__SNOWFLAKE__CREDENTIALS__USERNAME') }}"
+      password: "{{ env_var('DESTINATION__SNOWFLAKE__CREDENTIALS__PASSWORD') }}"
+      database: "{{ env_var('DESTINATION__SNOWFLAKE__CREDENTIALS__DATABASE') }}"
+      warehouse: "{{ env_var('DESTINATION__SNOWFLAKE__CREDENTIALS__WAREHOUSE') }}"
+      role: "{{ env_var('DESTINATION__SNOWFLAKE__CREDENTIALS__ROLE') }}"
+      schema: NYC_311
+      threads: 4
+      client_session_keep_alive: false

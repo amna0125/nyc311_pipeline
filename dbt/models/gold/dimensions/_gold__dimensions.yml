@@ -1,0 +1,15 @@
+version: 2
+
+models:
+  - name: dim_date
+    description: >
+      Conformed date dimension (one row per calendar day), keyed by YYYYMMDD.
+      The only dimension kept as its own table — it provides a gap-free calendar
+      and attributes (weekend/month/quarter/iso week) not derivable from the fact
+      alone. All other descriptive attributes live on fct_service_requests as
+      degenerate dimensions.
+    columns:
+      - name: date_sk
+        tests: [unique, not_null]
+      - name: date_day
+        tests: [unique, not_null]

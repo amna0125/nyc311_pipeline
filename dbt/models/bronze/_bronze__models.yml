@@ -1,0 +1,21 @@
+version: 2
+
+models:
+  - name: stg_nyc311__service_requests
+    description: >
+      Bronze mirror of NYC_311.SERVICE_REQUESTS_DLT — renamed and type-cast, one
+      row per service_request_id. No business logic.
+    columns:
+      - name: service_request_id
+        description: "Business primary key (was unique_key)."
+        tests:
+          - unique
+          - not_null
+      - name: created_at
+        description: "Timestamp the customer submitted the request."
+        tests:
+          - not_null
+      - name: ingested_at
+        description: "When the dlt pipeline loaded/refreshed this row."
+        tests:
+          - not_null

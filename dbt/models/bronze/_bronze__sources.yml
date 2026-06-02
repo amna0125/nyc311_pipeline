@@ -1,0 +1,23 @@
+version: 2
+
+sources:
+  - name: nyc_311
+    description: >
+      Raw NYC 311 service requests landed by the dlt pipeline (see
+      dags/nyc_311_dlt.py). dlt loads with write_disposition="merge" on
+      primary_key="unique_key", so the table holds one (latest) row per request.
+    database: NYC311          # DESTINATION__SNOWFLAKE__CREDENTIALS__DATABASE
+    schema: NYC_311           # dlt dataset_name (NYC_311_DLT_SNOWFLAKE_DATASET)
+    loaded_at_field: ingested_at
+    freshness:
+      warn_after: { count: 36, period: hour }
+      error_after: { count: 72, period: hour }
+    tables:
+      - name: service_requests_dlt
+        description: "NYC_311.SERVICE_REQUESTS_DLT — raw landed service requests."
+        columns:
+          - name: unique_key
+            description: "Business primary key of a service request."
+            tests:
+              - unique
+              - not_null

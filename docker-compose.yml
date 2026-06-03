@@ -69,14 +69,6 @@ services:
       AIRFLOW__WEBSERVER__SECRET_KEY: local-dev-airflow-secret-key
       PYTHONWARNINGS: ignore::SyntaxWarning
       DLT_DATA_DIR: /opt/airflow/data/dlt
-      DBT_PROFILES_DIR: /opt/airflow/dbt
-      DBT_PROJECT_DIR: /opt/airflow/dbt
-      DBT_TARGET_PATH: /tmp/dbt_target
-      DBT_LOG_PATH: /tmp/dbt_logs
-      # Windows bind mounts don't reliably propagate file mtimes into the
-      # container, so dbt's partial parser can miss edited/deleted models. This
-      # small project parses in seconds — disable partial parsing for correctness.
-      DBT_PARTIAL_PARSE: "false"
     env_file:
       - .env
     user: "${AIRFLOW_UID:-50000}:0"
@@ -86,7 +78,6 @@ services:
       - ./plugins:/opt/airflow/plugins
       - ./config:/opt/airflow/config
       - ./data:/opt/airflow/data
-      - ./dbt:/opt/airflow/dbt
     ports:
       - "8080:8080"
     command: webserver

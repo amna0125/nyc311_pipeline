@@ -212,7 +212,16 @@ def socrata_pages(window: dict[str, Any]) -> Iterable[list[dict[str, Any]]]:
     max_pages = window.get("max_pages")
     offset = 0
     page_count = 0
-    where_clause = f"created_date >= '{window['start']}' AND created_date < '{window['end']}'"
+    # Catch rows that changed on EITHER axis within the window: newly created
+    # requests AND requests that were closed during the window (their
+    # created_date may be far in the past, outside the lookback). The merge load
+    # on unique_key then upserts the closed_date/status change. $order stays on
+    # created_date — offset pagination only needs a stable order, not one that
+    # matches the filter.
+    where_clause = (
+        f"(created_date >= '{window['start']}' AND created_date < '{window['end']}') OR "
+        f"(closed_date >= '{window['start']}' AND closed_date < '{window['end']}')"
+    )
 
     while True:
         if max_pages is not None and page_count >= max_pages:

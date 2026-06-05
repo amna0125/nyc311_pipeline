@@ -1,8 +1,8 @@
 import os
 
 import pendulum
-from airflow.datasets import Dataset
 from airflow.decorators import dag
+from airflow.sdk import Asset
 from airflow.providers.dbt.cloud.operators.dbt import DbtCloudRunJobOperator
 
 
@@ -13,9 +13,17 @@ from airflow.providers.dbt.cloud.operators.dbt import DbtCloudRunJobOperator
 # models + tests. dbt itself runs in dbt Cloud against the project in its own
 # GitHub repo — see the standalone dbt repo's README for the Cloud setup.
 #
-# Same Dataset URI the dlt DAGs produce (Airflow matches datasets by URI), so a
-# successful load auto-triggers this — same event trigger the old local dbt DAG used.
-NYC_311_SERVICE_REQUESTS = Dataset("snowflake://NYC311/NYC_311/SERVICE_REQUESTS_DLT")
+# Same Asset URI the dlt DAGs produce (Airflow matches assets by URI), so a
+# successful load auto-triggers this - same event trigger the old local dbt DAG used.
+def snowflake_asset_uri() -> str:
+    account = os.getenv("DESTINATION__SNOWFLAKE__CREDENTIALS__HOST") or "local-dev"
+    database = os.getenv("DESTINATION__SNOWFLAKE__CREDENTIALS__DATABASE") or "NYC311"
+    schema = os.getenv("NYC_311_DLT_SNOWFLAKE_DATASET") or "NYC_311"
+    table = (os.getenv("NYC_311_DLT_TABLE_NAME") or "service_requests_dlt").upper()
+    return f"snowflake://{account}/{database}/{schema}/{table}"
+
+
+NYC_311_SERVICE_REQUESTS = Asset(snowflake_asset_uri())
 
 
 def env_int(name: str, default: int) -> int:

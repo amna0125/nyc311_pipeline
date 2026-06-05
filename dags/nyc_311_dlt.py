@@ -9,17 +9,24 @@ from typing import Any, Iterable
 import dlt
 import pendulum
 import requests
-from airflow.datasets import Dataset
 from airflow.decorators import dag, task
 from airflow.operators.empty import EmptyOperator
-from airflow.operators.python import get_current_context
+from airflow.sdk import Asset, get_current_context
 
 
-# Airflow Dataset representing the raw landed table. dlt load tasks "produce" it;
+# Airflow Asset representing the raw landed table. dlt load tasks "produce" it;
 # the dbt transform DAG (dags/nyc_311_dbt_local.py) is scheduled on it, so a
-# successful load auto-triggers the transform. Datasets are matched by URI, so
-# the dbt DAG declares an identical Dataset(...) with this same string.
-NYC_311_SERVICE_REQUESTS = Dataset("snowflake://NYC311/NYC_311/SERVICE_REQUESTS_DLT")
+# successful load auto-triggers the transform. Assets are matched by URI, so
+# the dbt DAG declares an identical Asset(...) with this same string.
+def snowflake_asset_uri() -> str:
+    account = os.getenv("DESTINATION__SNOWFLAKE__CREDENTIALS__HOST") or "local-dev"
+    database = os.getenv("DESTINATION__SNOWFLAKE__CREDENTIALS__DATABASE") or "NYC311"
+    schema = os.getenv("NYC_311_DLT_SNOWFLAKE_DATASET") or "NYC_311"
+    table = (os.getenv("NYC_311_DLT_TABLE_NAME") or "service_requests_dlt").upper()
+    return f"snowflake://{account}/{database}/{schema}/{table}"
+
+
+NYC_311_SERVICE_REQUESTS = Asset(snowflake_asset_uri())
 
 
 # This file keeps Airflow responsible for orchestration and lets dlt handle the
@@ -373,8 +380,11 @@ def nyc_311_dlt_incremental():
             start = pendulum.parse(conf["start_date"])
             end = pendulum.parse(conf["end_date"]) if conf.get("end_date") else start.add(days=1)
         else:
-            interval_end = get_current_context()["data_interval_end"]
-            end = pendulum.instance(interval_end).in_timezone("UTC")
+            # Airflow 3 manual runs can have no data interval (logical_date=None),
+            # so data_interval_end may be missing/None. Fall back to "now" so the
+            # daily incremental window still resolves for manual triggers.
+            interval_end = get_current_context().get("data_interval_end")
+            end = pendulum.instance(interval_end).in_timezone("UTC") if interval_end else pendulum.now("UTC")
             overlap_days = int(conf.get("overlap_days", env_int("NYC_311_OVERLAP_DAYS", 3)))
             start = end.subtract(days=overlap_days)
         return build_window(start, end, conf)

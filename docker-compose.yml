@@ -23,9 +23,10 @@ services:
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
+      AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-api-server:8080/execution/
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
-      AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session
+      AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
       AIRFLOW__WEBSERVER__SECRET_KEY: local-dev-airflow-secret-key
       PYTHONWARNINGS: ignore::SyntaxWarning
       AIRFLOW_UID: ${AIRFLOW_UID:-50000}
@@ -44,8 +45,8 @@ services:
       - |
         mkdir -p /opt/airflow/logs /opt/airflow/dags /opt/airflow/plugins /opt/airflow/config /opt/airflow/data
         chown -R "$${AIRFLOW_UID}:0" /opt/airflow/logs /opt/airflow/dags /opt/airflow/plugins /opt/airflow/config /opt/airflow/data
-        airflow db migrate
-        airflow users create \
+        runuser -u airflow -- airflow db migrate
+        runuser -u airflow -- airflow users create \
           --username "$${_AIRFLOW_WWW_USER_USERNAME}" \
           --password "$${_AIRFLOW_WWW_USER_PASSWORD}" \
           --firstname Airflow \
@@ -53,7 +54,7 @@ services:
           --role Admin \
           --email airflow@example.com || true
 
-  airflow-webserver:
+  airflow-api-server:
     build:
       context: .
       dockerfile: docker/airflow/Dockerfile
@@ -63,10 +64,15 @@ services:
     environment: &airflow-env
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
+      AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-api-server:8080/execution/
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
-      AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session
+      AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
       AIRFLOW__WEBSERVER__SECRET_KEY: local-dev-airflow-secret-key
+      # Shared secret used to sign/verify the Task Execution API JWTs. All
+      # components (api-server, scheduler, dag-processor) must agree on this or
+      # task supervisors get "Invalid auth token: Signature verification failed".
+      AIRFLOW__API_AUTH__JWT_SECRET: local-dev-airflow-jwt-secret
       PYTHONWARNINGS: ignore::SyntaxWarning
       DLT_DATA_DIR: /opt/airflow/data/dlt
     env_file:
@@ -80,9 +86,9 @@ services:
       - ./data:/opt/airflow/data
     ports:
       - "8080:8080"
-    command: webserver
+    command: api-server
     healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/api/v2/monitor/health"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -102,7 +108,29 @@ services:
     volumes: *airflow-volumes
     command: scheduler
     healthcheck:
-      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --hostname \"$${HOSTNAME}\""]
+      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --local"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  airflow-dag-processor:
+    build:
+      context: .
+      dockerfile: docker/airflow/Dockerfile
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+      airflow-api-server:
+        condition: service_healthy
+    environment: *airflow-env
+    env_file:
+      - .env
+    user: "${AIRFLOW_UID:-50000}:0"
+    volumes: *airflow-volumes
+    command: dag-processor
+    healthcheck:
+      test: ["CMD-SHELL", "airflow jobs check --job-type DagProcessorJob --local"]
       interval: 30s
       timeout: 10s
       retries: 5

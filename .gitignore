@@ -21,13 +21,6 @@ dbt/logs/
 dbt/.user.yml
 dbt/_dq_inspect.py
 
-# ── Evidence.dev (BI) build artifacts ───────────────────────────────────────
-reports/node_modules/
-reports/.evidence/
-reports/build/
-reports/.svelte-kit/
-reports/.env
-
 # ── OS / editor noise ────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db

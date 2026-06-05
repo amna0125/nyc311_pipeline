@@ -108,27 +108,5 @@ services:
       retries: 5
       start_period: 30s
 
-  # ── Evidence.dev BI layer (opt-in: `docker compose --profile bi up evidence`) ──
-  evidence:
-    image: evidencedev/devenv:latest
-    profiles: ["bi"]
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./reports:/evidence-workspace
-      # node_modules in a named volume — avoids slow/broken npm installs on the
-      # Windows bind mount (same rename/rmtree issue we hit with dbt).
-      - evidence-node-modules:/evidence-workspace/node_modules
-    environment:
-      # Evidence reads Snowflake creds from these source overrides (source = nyc311),
-      # reusing the values already in .env. account = Snowflake account identifier.
-      EVIDENCE_SOURCE__nyc311__account: ${DESTINATION__SNOWFLAKE__CREDENTIALS__HOST}
-      EVIDENCE_SOURCE__nyc311__username: ${DESTINATION__SNOWFLAKE__CREDENTIALS__USERNAME}
-      EVIDENCE_SOURCE__nyc311__password: ${DESTINATION__SNOWFLAKE__CREDENTIALS__PASSWORD}
-      EVIDENCE_SOURCE__nyc311__database: ${DESTINATION__SNOWFLAKE__CREDENTIALS__DATABASE}
-      EVIDENCE_SOURCE__nyc311__warehouse: ${DESTINATION__SNOWFLAKE__CREDENTIALS__WAREHOUSE}
-      EVIDENCE_SOURCE__nyc311__role: ${DESTINATION__SNOWFLAKE__CREDENTIALS__ROLE}
-
 volumes:
   airflow-postgres-db-volume:
-  evidence-node-modules:

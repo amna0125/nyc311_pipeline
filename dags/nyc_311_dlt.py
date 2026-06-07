@@ -29,17 +29,15 @@ def snowflake_asset_uri() -> str:
 NYC_311_SERVICE_REQUESTS = Asset(snowflake_asset_uri())
 
 
-# This file keeps Airflow responsible for orchestration and lets dlt handle the
+# Airflow is reposible for orchestration and lets dlt handle the
 # destination-specific loading details. That gives us one Socrata extractor and
-# lets us target Snowflake (and other destinations) via environment variables.
+# lets us target Snowflake (and other future destinations) via environment variables.
 #
 # There are two DAGs:
 # 1. nyc_311_dlt_incremental: scheduled daily, reloads a recent overlap window.
 # 2. nyc_311_dlt_backfill_monthly: manual, creates one task per historical month.
 #
-# Both DAGs still use Socrata pagination. The difference from the first custom
-# ClickHouse implementation is that dlt now performs the warehouse load and
-# merge/upsert behavior for each configured destination.
+# Both DAGs use Socrata pagination. 
 
 DATASET_FIELDS = [
     "unique_key",

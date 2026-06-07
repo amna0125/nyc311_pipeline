@@ -6,7 +6,7 @@ from airflow.sdk import Asset
 from airflow.providers.dbt.cloud.operators.dbt import DbtCloudRunJobOperator
 
 
-# Transformation half of the pipeline, running in dbt Cloud (not locally).
+# Transformation half of the pipeline, running in dbt Cloud.
 #
 # Airflow only ORCHESTRATES: when the dlt load produces the dataset below, this
 # DAG triggers a dbt Cloud job (via the dbt Cloud API) that builds the medallion

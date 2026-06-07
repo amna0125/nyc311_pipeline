@@ -3,621 +3,447 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>NYC 311 Data Pipeline — dlt · Airflow · Snowflake · dbt · Power BI</title>
+<title>NYC 311 Data Pipeline</title>
 <style>
   :root{
     --bg:#0c1020; --bg2:#11172e; --panel:#161d36; --panel2:#1b2440;
     --ink:#eef2ff; --muted:#9aa6c7; --line:#2a3354;
-    --accent:#ff8a3d;        /* NYC taxi orange */
-    --accent2:#4dd0ff;       /* civic blue      */
+    --accent:#ff8a3d; --accent2:#4dd0ff;
     --bronze:#cd7f32; --silver:#9fb1c9; --gold:#f4c542;
-    --green:#43d6a0; --red:#ff6b6b; --purple:#b58bff;
+    --green:#43d6a0; --red:#ff6b6b;
     --code:#0a0e1c;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;height:100%;}
   body{
-    font-family:"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;
+    font-family:"Segoe UI",system-ui,-apple-system,sans-serif;
     background:radial-gradient(1200px 700px at 80% -10%,#16204a 0,transparent 60%),var(--bg);
-    color:var(--ink); overflow:hidden;
+    color:var(--ink);overflow:hidden;
   }
-  /* ---------- deck ---------- */
   .deck{position:fixed;inset:0;}
   .slide{
     position:absolute;inset:0;display:none;flex-direction:column;
-    padding:54px 72px 70px;animation:fade .45s ease;
-    overflow:auto;
+    padding:44px 64px 64px;animation:fade .4s ease;overflow:auto;
   }
   .slide.active{display:flex;}
-  @keyframes fade{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
+  @keyframes fade{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:none;}}
   h1,h2,h3{margin:0;line-height:1.12;}
-  h2.title{font-size:40px;letter-spacing:-.5px;}
-  h2.title .num{color:var(--accent);font-variant-numeric:tabular-nums;margin-right:14px;}
-  .kicker{color:var(--accent2);font-weight:700;letter-spacing:3px;text-transform:uppercase;font-size:13px;margin-bottom:10px;}
-  .sub{color:var(--muted);font-size:17px;margin-top:10px;}
-  p{line-height:1.5;}
-  /* ---------- progress + chrome ---------- */
+  h2.title{font-size:38px;letter-spacing:-.5px;}
+  .kicker{color:var(--accent2);font-weight:700;letter-spacing:3px;text-transform:uppercase;font-size:12px;margin-bottom:8px;}
+  .sub{color:var(--muted);font-size:16px;margin-top:8px;}
+  p{line-height:1.5;margin:0;}
+  /* progress */
   .bar{position:fixed;top:0;left:0;height:4px;background:linear-gradient(90deg,var(--accent),var(--accent2));z-index:50;transition:width .3s;}
-  .chrome{position:fixed;bottom:18px;right:26px;display:flex;align-items:center;gap:14px;color:var(--muted);font-size:13px;z-index:50;}
-  .chrome button{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;width:34px;height:30px;cursor:pointer;font-size:15px;}
+  .chrome{position:fixed;bottom:16px;right:22px;display:flex;align-items:center;gap:12px;color:var(--muted);font-size:13px;z-index:50;}
+  .chrome button{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;width:32px;height:28px;cursor:pointer;font-size:14px;}
   .chrome button:hover{border-color:var(--accent);}
-  .brand{position:fixed;bottom:18px;left:26px;color:var(--muted);font-size:12px;letter-spacing:1px;z-index:50;}
+  .brand{position:fixed;bottom:16px;left:22px;color:var(--muted);font-size:11px;letter-spacing:1px;z-index:50;}
   .brand b{color:var(--ink);}
-  /* ---------- layout helpers ---------- */
-  .grid{display:grid;gap:18px;}
+  /* grids */
+  .grid{display:grid;gap:16px;}
   .g2{grid-template-columns:1fr 1fr;}
   .g3{grid-template-columns:repeat(3,1fr);}
-  .g4{grid-template-columns:repeat(4,1fr);}
-  .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:14px;padding:18px 20px;}
-  .card h3{font-size:18px;margin-bottom:8px;}
-  .card p,.card li{color:var(--muted);font-size:14.5px;}
-  .card.accent{border-color:var(--accent);box-shadow:0 0 0 1px rgba(255,138,61,.25),0 14px 40px rgba(0,0,0,.35);}
-  ul.clean{margin:6px 0 0;padding-left:18px;}
-  ul.clean li{margin:6px 0;line-height:1.45;}
-  .tag{display:inline-block;font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;border:1px solid var(--line);color:var(--ink);background:var(--panel);}
-  .pill-orange{color:#1a1208;background:var(--accent);border:none;}
-  .pill-blue{color:#04141d;background:var(--accent2);border:none;}
+  .split{display:grid;gap:20px;}
+  .split-40{grid-template-columns:2fr 3fr;}
+  .split-50{grid-template-columns:1fr 1fr;}
+  .split-60{grid-template-columns:3fr 2fr;}
+  /* cards */
+  .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:12px;padding:16px 18px;}
+  .card h3{font-size:16px;margin-bottom:8px;}
+  .card p,.card li{color:var(--muted);font-size:14px;}
+  .card.hi{border-color:var(--accent);box-shadow:0 0 0 1px rgba(255,138,61,.2),0 12px 36px rgba(0,0,0,.35);}
+  .card.blue{border-color:var(--accent2);}
+  ul.clean{margin:4px 0 0;padding-left:16px;}
+  ul.clean li{margin:5px 0;line-height:1.4;}
+  /* tags / pills */
+  .tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;border:1px solid var(--line);color:var(--ink);background:var(--panel);}
+  .pill-o{color:#1a1208;background:var(--accent);border:none;}
   .muted{color:var(--muted);}
-  code,.mono{font-family:"Cascadia Code",Consolas,Menlo,monospace;}
-  pre{background:var(--code);border:1px solid var(--line);border-radius:12px;padding:16px 18px;overflow:auto;
-      font-family:"Cascadia Code",Consolas,Menlo,monospace;font-size:13.5px;line-height:1.5;color:#d7e2ff;margin:0;}
-  pre .c{color:#5f6f95;} pre .k{color:#ff8a3d;} pre .s{color:#43d6a0;} pre .f{color:#4dd0ff;} pre .n{color:#f4c542;}
-  .kv{display:flex;justify-content:space-between;border-bottom:1px dashed var(--line);padding:9px 0;font-size:15px;}
+  code,.mono{font-family:"Cascadia Code",Consolas,Menlo,monospace;font-size:.92em;}
+  /* kv rows */
+  .kv{display:flex;justify-content:space-between;border-bottom:1px dashed var(--line);padding:7px 0;font-size:14px;}
   .kv:last-child{border-bottom:none;}
   .kv b{color:var(--ink);font-weight:600;} .kv span{color:var(--muted);text-align:right;}
-  /* ---------- flow / pipeline ---------- */
+  /* pipeline flow */
   .flow{display:flex;align-items:stretch;gap:0;flex-wrap:wrap;}
-  .node{flex:1;min-width:120px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;text-align:center;}
-  .node .t{font-weight:700;font-size:15px;} .node .d{color:var(--muted);font-size:12px;margin-top:4px;}
-  .arrow{display:flex;align-items:center;color:var(--accent);font-size:22px;padding:0 8px;}
-  /* medallion bands */
-  .band{border-left:5px solid var(--line);padding:8px 0 8px 18px;margin:10px 0;}
-  .band.bronze{border-color:var(--bronze);} .band.silver{border-color:var(--silver);} .band.gold{border-color:var(--gold);}
-  .lbl{font-weight:800;letter-spacing:1px;text-transform:uppercase;font-size:13px;}
+  .node{flex:1;min-width:100px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;}
+  .node .t{font-weight:700;font-size:14px;} .node .d{color:var(--muted);font-size:11px;margin-top:3px;}
+  .arrow{display:flex;align-items:center;color:var(--accent);font-size:20px;padding:0 6px;}
+  /* medallion */
+  .lbl{font-weight:800;letter-spacing:1px;text-transform:uppercase;font-size:12px;}
   .lbl.bronze{color:var(--bronze);} .lbl.silver{color:var(--silver);} .lbl.gold{color:var(--gold);}
-  /* title slide */
-  .hero{height:100%;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;}
-  .hero h1{font-size:62px;letter-spacing:-1.5px;background:linear-gradient(90deg,#fff,#bcd2ff);-webkit-background-clip:text;background-clip:text;color:transparent;}
-  .hero .chips{display:flex;gap:10px;margin-top:26px;flex-wrap:wrap;}
-  .hero .chip{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:8px 16px;font-size:14px;font-weight:600;}
-  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:7px;}
-  .small{font-size:13px;}
-  table.t{width:100%;border-collapse:collapse;font-size:14px;}
-  table.t th,table.t td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);}
-  table.t th{color:var(--accent2);font-size:12px;text-transform:uppercase;letter-spacing:1px;}
+  .stripe{border-left:4px solid var(--line);padding:6px 0 6px 14px;margin:8px 0;}
+  .stripe.bronze{border-color:var(--bronze);} .stripe.silver{border-color:var(--silver);} .stripe.gold{border-color:var(--gold);}
+  /* hero / title */
+  .hero{height:100%;display:flex;flex-direction:column;justify-content:center;}
+  .hero h1{font-size:56px;letter-spacing:-1.5px;background:linear-gradient(90deg,#fff,#bcd2ff);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .chips{display:flex;gap:8px;margin-top:22px;flex-wrap:wrap;}
+  .chip{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:7px 14px;font-size:13px;font-weight:600;}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px;}
+  /* screenshots */
+  .screenshot{width:100%;border-radius:10px;border:1px solid var(--line);display:block;object-fit:contain;}
+  .img-wrap{background:var(--code);border:1px solid var(--line);border-radius:12px;padding:6px;overflow:hidden;}
+  .img-caption{font-size:11px;color:var(--muted);text-align:center;margin-top:5px;}
+  /* callouts */
+  .note{background:rgba(255,138,61,.08);border:1px solid rgba(255,138,61,.35);border-radius:10px;padding:10px 14px;color:#ffd9bf;font-size:13px;}
+  .warn{background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.4);border-radius:10px;padding:12px 16px;color:#ffd0d0;font-size:14px;}
+  table.t{width:100%;border-collapse:collapse;font-size:13px;}
+  table.t th,table.t td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);}
+  table.t th{color:var(--accent2);font-size:11px;text-transform:uppercase;letter-spacing:1px;}
   table.t td{color:var(--muted);} table.t td b{color:var(--ink);}
-  .note{background:rgba(255,138,61,.08);border:1px solid rgba(255,138,61,.35);border-radius:12px;padding:12px 16px;color:#ffd9bf;font-size:14px;}
-  .warn{background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.4);border-radius:12px;padding:14px 18px;color:#ffd0d0;}
-  .ok{color:var(--green);font-weight:700;}
   .x{color:var(--red);font-weight:700;}
-  .agenda{display:grid;grid-template-columns:1fr 1fr;gap:14px 40px;margin-top:18px;}
-  .agenda div{display:flex;gap:14px;align-items:baseline;font-size:18px;border-bottom:1px solid var(--line);padding:12px 0;}
-  .agenda .n{color:var(--accent);font-weight:800;font-variant-numeric:tabular-nums;}
-  .scroll-hint{font-size:12px;color:var(--muted);}
+  .ok{color:var(--green);font-weight:700;}
 </style>
 </head>
 <body>
 <div class="bar" id="bar"></div>
-
 <div class="deck" id="deck">
 
-  <!-- 0 — TITLE -->
-  <section class="slide active">
-    <div class="hero">
-      <div class="kicker">End-to-End Data Engineering Project</div>
-      <h1>NYC 311 Service Requests<br/>Analytics Pipeline</h1>
-      <p class="sub" style="max-width:760px">
-        Ingesting New York City's public 311 complaints from a live API, landing them in
-        Snowflake, transforming them through a dbt medallion architecture, and serving
-        insights in Power BI — fully orchestrated by Airflow.
-      </p>
-      <div class="chips">
-        <span class="chip"><span class="dot" style="background:var(--accent2)"></span>Socrata API</span>
-        <span class="chip"><span class="dot" style="background:#fff"></span>dlt</span>
-        <span class="chip"><span class="dot" style="background:#43d6a0"></span>Airflow</span>
-        <span class="chip"><span class="dot" style="background:#4dd0ff"></span>Snowflake</span>
-        <span class="chip"><span class="dot" style="background:#ff8a3d"></span>dbt (Cloud)</span>
-        <span class="chip"><span class="dot" style="background:#f4c542"></span>Power BI</span>
-      </div>
-      <p class="sub small" style="margin-top:30px">Amna Saeed · Data Engineering Project · 2026</p>
+<!-- ① TITLE -->
+<section class="slide active">
+  <div class="hero">
+    <div class="kicker">End-to-End Data Engineering Project</div>
+    <h1>NYC 311 Service Requests<br/>Analytics Pipeline</h1>
+    <p class="sub" style="max-width:700px;margin-top:14px">
+      Ingesting New York City's live 311 complaint data, landing it in Snowflake,
+      transforming it through a dbt medallion architecture, and serving insights in Power BI —
+      fully orchestrated by Airflow.
+    </p>
+    <div class="chips" style="margin-top:20px">
+      <span class="chip"><span class="dot" style="background:var(--accent2)"></span>Socrata API</span>
+      <span class="chip"><span class="dot" style="background:#fff"></span>dlt</span>
+      <span class="chip"><span class="dot" style="background:#43d6a0"></span>Airflow</span>
+      <span class="chip"><span class="dot" style="background:#4dd0ff"></span>Snowflake</span>
+      <span class="chip"><span class="dot" style="background:#ff8a3d"></span>dbt Cloud</span>
+      <span class="chip"><span class="dot" style="background:#f4c542"></span>Power BI</span>
     </div>
-  </section>
+    <p class="muted" style="margin-top:28px;font-size:13px">Amna Saeed · 2026</p>
+  </div>
+</section>
 
-  <!-- AGENDA -->
-  <section class="slide">
-    <div class="kicker">Roadmap</div>
-    <h2 class="title">What we'll walk through</h2>
-    <div class="agenda">
-      <div><span class="n">1</span><span>The data source — what we're ingesting</span></div>
-      <div><span class="n">2</span><span>Initial plan: Azure + ADF, and why it changed</span></div>
-      <div><span class="n">3</span><span>dlt + Airflow + Snowflake — extraction & loading</span></div>
-      <div><span class="n">4</span><span>dbt — medallion transformation & data quality</span></div>
-      <div><span class="n">5</span><span>Power BI — visualization & scheduled refresh</span></div>
-      <div><span class="n">6</span><span>Known limitation — the overlap window</span></div>
+<!-- ② DATA SOURCE -->
+<section class="slide">
+  <div class="kicker">Step 1</div>
+  <h2 class="title">The Data Source</h2>
+  <p class="sub">NYC Open Data — 311 Service Requests · Socrata SODA 2.x API</p>
+  <div class="split split-50" style="margin-top:16px;flex:1;align-items:start">
+    <div class="card">
+      <div class="kv"><b>Provider</b><span>NYC Open Data (Socrata)</span></div>
+      <div class="kv"><b>Endpoint</b><span class="mono">erm2-nwe9.json</span></div>
+      <div class="kv"><b>Format</b><span>JSON over REST</span></div>
+      <div class="kv"><b>Source refresh</b><span>Daily</span></div>
+      <div class="kv"><b>Volume</b><span>~38M+ rows · loading 2020 → now</span></div>
+      <div class="kv"><b>Columns ingested</b><span>44 business fields</span></div>
+      <div class="kv"><b>Primary key</b><span class="mono">unique_key</span></div>
     </div>
-    <div class="note" style="margin-top:26px">
-      Architecture in one line:
-      <b>Socrata API → dlt → Snowflake → dbt (bronze→silver→gold) → Power BI</b>,
-      with <b>Airflow</b> orchestrating ingestion and triggering transformation.
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card hi">
+        <h3>What makes this a good engineering problem</h3>
+        <ul class="clean">
+          <li><b>Large &amp; growing</b> — requires real incremental loading, not full reloads</li>
+          <li><b>Messy</b> — sentinel "missing" values (<i>Unspecified</i>, <i>N/A</i>), bad ZIPs, out-of-range coordinates</li>
+          <li><b>Mutable</b> — a request's status and closed date change <em>after</em> creation</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Key fields</h3>
+        <p class="muted">Agency · Complaint type · Borough · Status · Created / closed date · Geolocation · Channel type</p>
+      </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- 1 — DATA SOURCE -->
-  <section class="slide">
-    <h2 class="title"><span class="num">1</span>The Data Source</h2>
-    <p class="sub">NYC Open Data — 311 Service Requests (2010–present)</p>
-    <div class="grid g2" style="margin-top:18px">
-      <div class="card">
-        <h3>Source profile</h3>
-        <div class="kv"><b>Provider</b><span>NYC Open Data (Socrata / SODA 2.x)</span></div>
-        <div class="kv"><b>Domain</b><span class="mono">data.cityofnewyork.us</span></div>
-        <div class="kv"><b>Dataset ID</b><span class="mono">erm2-nwe9</span></div>
-        <div class="kv"><b>Format</b><span>JSON over REST API</span></div>
-        <div class="kv"><b>Refresh cadence</b><span>Portal updated daily</span></div>
-        <div class="kv"><b>Volume</b><span>~38M+ rows all-time · loading 2020→now</span></div>
-        <div class="kv"><b>Schema</b><span>44 business columns ingested</span></div>
-      </div>
-      <div class="card accent">
-        <h3>What is a "311" request?</h3>
-        <p>Every non-emergency complaint or service request New Yorkers file —
-           noise, potholes, heating, sanitation, illegal parking — tagged with
-           the responding <b>agency</b>, <b>complaint type</b>, <b>borough</b>,
-           <b>status</b>, timestamps and geolocation.</p>
-        <h3 style="margin-top:14px">Why it's a good engineering subject</h3>
-        <ul class="clean">
-          <li><b>Large &amp; growing</b> — needs real incremental loading, not full reloads.</li>
-          <li><b>Messy</b> — sentinel "missing" values, bad ZIPs, out-of-range coordinates.</li>
-          <li><b>Mutable</b> — a request's status/closed date changes <i>after</i> creation.</li>
-        </ul>
-      </div>
+<!-- ③ JOURNEY: AZURE → DLT -->
+<section class="slide">
+  <div class="kicker">Step 2</div>
+  <h2 class="title">The Journey to the Right Stack</h2>
+  <div class="grid g3" style="margin-top:16px;flex:1;align-items:start">
+    <div class="card">
+      <h3>Initial Plan — Azure + ADF</h3>
+      <ul class="clean">
+        <li>Provisioned <b>Azure Data Lake Storage (ADLS Gen2)</b> — storage account with containers for raw / staged data</li>
+        <li><b>Azure Data Factory</b> to orchestrate copy from the 311 API into the lake</li>
+      </ul>
+      <p class="muted" style="margin-top:10px">Classic lake-first cloud ingestion pattern.</p>
     </div>
-    <div class="note" style="margin-top:16px">
-      The endpoint <span class="mono">https://data.cityofnewyork.us/resource/erm2-nwe9.json</span>
-      supports SoQL filtering (<span class="mono">$where</span>, <span class="mono">$limit</span>,
-      <span class="mono">$offset</span>, <span class="mono">$order</span>) — the foundation for our paged, windowed extraction.
+    <div class="card" style="border-color:var(--red)">
+      <h3 style="color:var(--red)">Where it broke down</h3>
+      <ul class="clean">
+        <li><span class="x">Pagination.</span> Socrata requires explicit limit/offset over millions of rows</li>
+        <li>Expressing that loop in ADF's copy/lookup/until activities became <b>complicated and brittle</b></li>
+        <li>Looked at <b>Snowpipe</b> — it ingests files already staged in storage; doesn't call an API and paginate</li>
+      </ul>
     </div>
-  </section>
+    <div class="card hi">
+      <h3>Decision — dlt + Airflow + Snowflake</h3>
+      <ul class="clean">
+        <li><b>Pagination</b> = a Python generator loop — natural, testable</li>
+        <li><b>dlt</b> gives schema inference, typing &amp; merge/upsert for free</li>
+        <li><b>Airflow</b> gives scheduling, retries, backfill &amp; lineage</li>
+        <li>Warehouse-agnostic (same code targets Snowflake or ClickHouse)</li>
+      </ul>
+    </div>
+  </div>
+  <div class="note" style="margin-top:14px">
+    The blocker wasn't Azure — it was forcing a <b>code-shaped problem</b> (paginated API + typed merge) into a <b>drag-and-drop ETL tool</b>.
+  </div>
+</section>
 
-  <!-- 2a — INITIAL PLAN -->
-  <section class="slide">
-    <h2 class="title"><span class="num">2</span>Initial Plan — Azure + ADF</h2>
-    <p class="sub">The first design targeted a fully Azure-native stack.</p>
-    <div class="grid g2" style="margin-top:16px">
+<!-- ④ DLT + AIRFLOW + SNOWFLAKE -->
+<section class="slide">
+  <div class="kicker">Step 3</div>
+  <h2 class="title">dlt + Airflow + Snowflake</h2>
+  <div class="split split-40" style="margin-top:14px;flex:1;align-items:start;gap:18px">
+    <div style="display:flex;flex-direction:column;gap:14px">
       <div class="card">
-        <h3>What we set up</h3>
+        <h3>Extraction</h3>
         <ul class="clean">
-          <li><b>Azure Data Lake Storage (ADLS Gen2)</b> as the landing zone — provisioned the storage account and <b>containers</b> for raw / staged data.</li>
-          <li><b>Azure Data Factory (ADF)</b> to orchestrate the copy from the 311 API into the lake.</li>
+          <li>Airflow passes dlt a bounded <b>created_date window</b></li>
+          <li>Generator paginates: <span class="mono">$limit / $offset / $order / $where</span></li>
+          <li>Each row: timestamps parsed, coords cast to float, location JSON serialized</li>
+          <li>Retry with backoff on 429 / 5xx</li>
         </ul>
-        <p class="muted" style="margin-top:10px">A classic "lake-first" cloud ingestion pattern.</p>
       </div>
-      <div class="card" style="border-color:var(--red)">
-        <h3 style="color:var(--red)">Where it broke down</h3>
+      <div class="card hi">
+        <h3>Loading into Snowflake</h3>
         <ul class="clean">
-          <li><span class="x">API limitations.</span> The Socrata endpoint requires explicit
-              <b>pagination</b> (limit/offset over millions of rows).</li>
-          <li>Expressing that paging loop in ADF's copy/lookup/until activities became
-              <b>complicated and brittle</b> — a lot of pipeline plumbing for a simple "page through an API" job.</li>
-          <li>Hard to make incremental, retry-safe, and readable.</li>
+          <li><span class="mono">primary_key = "unique_key"</span></li>
+          <li><span class="mono">write_disposition = "merge"</span> — same key = <b>update, not duplicate</b></li>
+          <li>Lands in <span class="mono">NYC311.NYC_311.SERVICE_REQUESTS_DLT</span></li>
+          <li>dlt auto-creates &amp; evolves the schema</li>
         </ul>
       </div>
     </div>
-    <div class="note" style="margin-top:16px">
-      The blocker wasn't Azure itself — it was forcing a <b>code-shaped problem (API pagination + typing + merge)</b>
-      into a <b>drag-and-drop ETL tool</b>.
+    <div>
+      <div class="img-wrap">
+        <img src="airflow_dagview.png" class="screenshot" alt="Airflow DAG list — 3 DAGs all green" />
+      </div>
+      <p class="img-caption">Airflow UI — 3 DAGs, all successful · dbt_cloud triggered by dataset · incremental runs daily</p>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- 2b — PIVOT -->
-  <section class="slide">
-    <h2 class="title"><span class="num">2</span>Evaluating Alternatives → The Pivot</h2>
-    <div class="grid g3" style="margin-top:16px">
-      <div class="card">
-        <h3>Considered: Snowpipe</h3>
-        <p>Snowflake's auto-ingest service. But Snowpipe ingests files
-           <b>already staged</b> in cloud storage — it loads <i>from</i> a stage, it doesn't
-           <b>call an API and paginate</b>.</p>
-        <p class="muted">It solves loading, not extraction — we'd still need something to pull &amp; page the API first.</p>
-      </div>
-      <div class="card accent">
-        <h3>Chosen: dlt + Airflow + Snowflake</h3>
+<!-- ⑤ DAGs IN ACTION -->
+<section class="slide">
+  <div class="kicker">Step 3 · Orchestration</div>
+  <h2 class="title">Two DAGs — and an Event-Driven Hand-off</h2>
+  <div class="split split-50" style="margin-top:14px;flex:1;align-items:start;gap:18px">
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="card" style="margin-bottom:4px">
+        <h3><span class="tag pill-o">DAILY</span>&ensp;nyc_311_dlt_incremental</h3>
         <ul class="clean">
-          <li><b>dlt</b> → handles extraction + typed loading + merge/upsert.</li>
-          <li><b>Airflow</b> → schedules &amp; controls the time windows.</li>
-          <li><b>Snowflake</b> → the analytics warehouse.</li>
+          <li>Reloads a <b>3-day overlap window</b> — catches late status / closure updates via merge</li>
+          <li><span class="mono">@daily</span> · 2 retries · 5-min delay</li>
         </ul>
       </div>
       <div class="card">
-        <h3>Why this won</h3>
+        <h3><span class="tag">MANUAL</span>&ensp;nyc_311_dlt_backfill_monthly</h3>
         <ul class="clean">
-          <li>Pagination is just a Python generator loop — natural, testable.</li>
-          <li>dlt gives <b>schema inference, typing &amp; merge</b> for free.</li>
-          <li>Airflow gives <b>scheduling, retries, backfill &amp; lineage</b>.</li>
-          <li>Warehouse-agnostic (same code targets Snowflake or ClickHouse).</li>
+          <li>One mapped task per month — failures retry at <b>month granularity</b></li>
+          <li>Used once to load 2020 → now</li>
         </ul>
       </div>
+      <div class="card blue">
+        <h3>Dataset-triggered dbt</h3>
+        <p>Both dlt DAGs produce an <b>Airflow Dataset</b> on success. The dbt Cloud DAG is scheduled on that URI — successful load <b>automatically triggers dbt</b>, no cron coupling.</p>
+      </div>
     </div>
-    <div class="flow" style="margin-top:22px">
-      <div class="node"><div class="t">Socrata API</div><div class="d">paged JSON</div></div>
-      <div class="arrow">→</div>
-      <div class="node"><div class="t">dlt</div><div class="d">extract · type · merge</div></div>
-      <div class="arrow">→</div>
-      <div class="node"><div class="t">Snowflake</div><div class="d">raw landing table</div></div>
-      <div class="arrow">→</div>
-      <div class="node"><div class="t">Airflow</div><div class="d">schedules it all</div></div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="img-wrap">
+        <img src="dag_incremental_runs.png" class="screenshot" alt="Incremental DAG runs" />
+      </div>
+      <p class="img-caption">nyc_311_dlt_incremental — scheduled daily runs + manual backfill runs</p>
+      <div class="img-wrap">
+        <img src="dag_dbt_trigger.png" class="screenshot" alt="dbt Cloud DAG triggered by Asset" />
+      </div>
+      <p class="img-caption">nyc_311_dbt_cloud — triggered by the Snowflake dataset asset after each load</p>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- 3 — DLT + AIRFLOW + SNOWFLAKE -->
-  <section class="slide">
-    <h2 class="title"><span class="num">3</span>dlt + Airflow + Snowflake</h2>
-    <p class="sub">Airflow owns <i>orchestration</i>; dlt owns <i>destination-specific loading</i>.</p>
-    <div class="grid g2" style="margin-top:14px">
+<!-- ⑥ DBT OVERVIEW + MEDALLION -->
+<section class="slide">
+  <div class="kicker">Step 4</div>
+  <h2 class="title">dbt — Medallion Transformation</h2>
+  <p class="sub">Standalone dbt project in <b>dbt Cloud</b> · two isolated environments</p>
+  <div class="split split-50" style="margin-top:14px;align-items:start;gap:16px">
+    <div style="display:flex;flex-direction:column;gap:12px">
       <div class="card">
-        <h3>Extraction (the dlt source)</h3>
-        <ul class="clean">
-          <li>Airflow passes dlt a bounded <b>created_date window</b>.</li>
-          <li><b>Pagination</b> lives in a generator: <span class="mono">$limit / $offset / $order / $where</span> — a 200k-row month becomes 4 calls at 50k/page.</li>
-          <li>Each row is <b>normalized</b>: timestamps parsed, coordinates cast to float, the <span class="mono">location</span> object serialized to JSON.</li>
-          <li><b>Retry with backoff</b> on 429/5xx; raw &amp; staged JSON snapshots written to disk for replay.</li>
-        </ul>
-      </div>
-      <div class="card">
-        <h3>Loading (the dlt resource)</h3>
-        <ul class="clean">
-          <li><span class="mono">primary_key="unique_key"</span></li>
-          <li><span class="mono">write_disposition="merge"</span> — reloading the same key <b>updates / deduplicates</b> instead of appending.</li>
-          <li>dlt auto-creates &amp; evolves the schema in Snowflake.</li>
-          <li>Lands in <span class="mono">NYC311.NYC_311.SERVICE_REQUESTS_DLT</span>.</li>
-        </ul>
-      </div>
-    </div>
-    <pre style="margin-top:14px"><span class="k">@dlt.resource</span>(name=table_name,
-              primary_key=<span class="s">"unique_key"</span>,
-              write_disposition=<span class="s">"merge"</span>)   <span class="c"># merge = upsert on unique_key</span>
-<span class="k">def</span> <span class="f">service_requests</span>():
-    <span class="k">yield from</span> service_request_rows(window)   <span class="c"># paged + normalized rows</span></pre>
-  </section>
-
-  <!-- 3b — THE DAGS -->
-  <section class="slide">
-    <h2 class="title"><span class="num">3</span>Two Airflow DAGs</h2>
-    <div class="grid g2" style="margin-top:16px">
-      <div class="card accent">
-        <h3><span class="tag pill-orange">DAILY</span>&nbsp; nyc_311_dlt_incremental</h3>
-        <ul class="clean">
-          <li>Runs <span class="mono">@daily</span>, <span class="mono">catchup=False</span>, <span class="mono">max_active_runs=1</span>.</li>
-          <li>Reloads a small <b>recent overlap window</b> (default <b>3 days</b>) so late status/closure updates are captured by the merge.</li>
-          <li>2 automatic retries with a 5-min delay.</li>
-        </ul>
-      </div>
-      <div class="card">
-        <h3><span class="tag">MANUAL</span>&nbsp; nyc_311_dlt_backfill_monthly</h3>
-        <ul class="clean">
-          <li>One <b>mapped task per month</b> across a date range.</li>
-          <li><span class="mono">max_active_tasks=1</span> — months load sequentially so failures retry at <b>month granularity</b>.</li>
-          <li>Used once to load history back to 2020.</li>
-        </ul>
-      </div>
-    </div>
-    <div class="card" style="margin-top:16px;border-color:var(--accent2)">
-      <h3>Data-aware scheduling — the hand-off to dbt</h3>
-      <p>Both DAGs <b>"produce" an Airflow Dataset</b> on success:</p>
-      <pre style="margin-top:8px">Dataset(<span class="s">"snowflake://NYC311/NYC_311/SERVICE_REQUESTS_DLT"</span>)</pre>
-      <p style="margin-top:8px">The dbt DAG is <b>scheduled on that exact dataset URI</b>, so a successful load
-         <b>automatically triggers transformation</b> — no fragile cron coupling, no polling.</p>
-    </div>
-  </section>
-
-  <!-- 4 — DBT OVERVIEW -->
-  <section class="slide">
-    <h2 class="title"><span class="num">4</span>dbt — Transformation Layer</h2>
-    <p class="sub">A standalone dbt project (<span class="mono">../nyc311-dbt</span>) running in <b>dbt Cloud</b>, following the Medallion architecture.</p>
-    <div class="grid g2" style="margin-top:14px">
-      <div class="card">
-        <h3>Two environments (isolation by target schema)</h3>
+        <h3>Environment isolation</h3>
         <table class="t">
-          <tr><th>Env</th><th>Target schema</th><th>Reads source</th></tr>
-          <tr><td><b>Dev</b></td><td class="mono">DBT_AMNA</td><td>same raw</td></tr>
-          <tr><td><b>Prod</b></td><td class="mono">NYC_311</td><td>same raw</td></tr>
+          <tr><th>Env</th><th>Target schema</th><th>Models land in</th></tr>
+          <tr><td><b>Dev</b></td><td class="mono">DBT_AMNA</td><td class="mono">DBT_AMNA_BRONZE/SILVER/GOLD</td></tr>
+          <tr><td><b>Prod</b></td><td class="mono">NYC_311</td><td class="mono">NYC_311_BRONZE/SILVER/GOLD</td></tr>
         </table>
-        <p class="muted" style="margin-top:10px">Both read the same raw <span class="mono">SERVICE_REQUESTS_DLT</span>;
-           the <span class="mono">+schema:</span> configs append <span class="mono">_BRONZE/_SILVER/_GOLD</span> so dev &amp; prod never collide.</p>
+        <p class="muted" style="margin-top:8px">Both read the same raw source; <span class="mono">+schema:</span> config appends the layer suffix — dev &amp; prod never collide.</p>
       </div>
-      <div class="card accent">
-        <h3>Production job orchestration</h3>
-        <ul class="clean">
-          <li>The Prod job runs <span class="mono">dbt deps → dbt seed → dbt build</span>.</li>
-          <li>Airflow triggers it via the <b>dbt Cloud API</b> (<span class="mono">DbtCloudRunJobOperator</span>) — fired by the dataset the dlt load produces.</li>
-          <li>Airflow <b>waits for termination</b>, so the task reflects the real dbt run status.</li>
-        </ul>
-        <p class="muted" style="margin-top:8px">Net effect: <b>incremental load completes → dbt build runs → tests run</b>, end to end, automatically.</p>
+      <div class="card">
+        <h3>Prod job (Airflow → dbt Cloud API)</h3>
+        <p class="muted">Runs <span class="mono">dbt deps → dbt seed → dbt build</span>. Airflow blocks until the run finishes (<span class="mono">wait_for_termination=True</span>) so task status reflects real dbt outcome.</p>
       </div>
     </div>
-    <div class="flow" style="margin-top:18px">
-      <div class="node">raw (dlt)</div><div class="arrow">→</div>
-      <div class="node"><span class="lbl bronze">Bronze</span></div><div class="arrow">→</div>
-      <div class="node"><span class="lbl silver">Silver</span></div><div class="arrow">→</div>
-      <div class="node"><span class="lbl gold">Gold</span></div><div class="arrow">→</div>
-      <div class="node">Power BI</div>
+    <div>
+      <div class="flow" style="margin-bottom:16px">
+        <div class="node"><div class="t">Raw (dlt)</div><div class="d">SERVICE_REQUESTS_DLT</div></div>
+        <div class="arrow">→</div>
+        <div class="node"><div class="t" style="color:var(--bronze)">Bronze</div><div class="d">view · typed mirror</div></div>
+        <div class="arrow">→</div>
+        <div class="node"><div class="t" style="color:var(--silver)">Silver</div><div class="d">view · clean + enrich</div></div>
+        <div class="arrow">→</div>
+        <div class="node"><div class="t" style="color:var(--gold)">Gold</div><div class="d">dim · fact · marts</div></div>
+      </div>
+      <div class="card hi">
+        <div class="stripe bronze"><span class="lbl bronze">Bronze</span> — view — 1:1 typed mirror, explicit column selection, defensive dedup</div>
+        <div class="stripe silver"><span class="lbl silver">Silver</span> — view — sentinel → NULL, standardize, validate, derive measures &amp; SLA flags</div>
+        <div class="stripe gold"><span class="lbl gold">Gold</span> — dim_date (table) · fct_service_requests (incremental merge) · 3 marts (table)</div>
+      </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- 4 BRONZE -->
-  <section class="slide">
-    <h2 class="title"><span class="lbl bronze">Bronze</span> &nbsp;Layer — Faithful Mirror</h2>
-    <p class="sub">Materialized as <b>views</b>. A 1:1, typed mirror of the dlt landing table.</p>
-    <div class="grid g2" style="margin-top:14px">
+<!-- ⑦ DBT LAYERS + QUALITY -->
+<section class="slide">
+  <div class="kicker">Step 4 · Detail</div>
+  <h2 class="title">dbt — Layers, Macro, Seeds &amp; Tests</h2>
+  <div class="grid g3" style="margin-top:14px;flex:1;align-items:start">
+    <div style="display:flex;flex-direction:column;gap:12px">
       <div class="card">
-        <h3>stg_nyc311__service_requests.sql</h3>
-        <ul class="clean">
-          <li><b>Rename</b> to clean, consistent names; <b>cast types</b> (datetimes → <span class="mono">timestamp_ntz</span>, coords → float, <span class="mono">location</span> → VARIANT).</li>
-          <li><b>Explicit column selection</b> (no <span class="mono">select *</span>) — if the API drops/renames a column, the model fails <i>loudly</i> instead of losing data silently.</li>
-          <li><b>Defensive dedup</b> via <span class="mono">row_number()</span> on <span class="mono">unique_key</span> — keeps the latest row even if a merge load left duplicates.</li>
-        </ul>
+        <h3><span class="lbl gold">Gold</span> — why incremental?</h3>
+        <p class="muted"><b>fct_service_requests</b> has tens of millions of rows. Filtering on <span class="mono">ingested_at &gt; max(ingested_at)</span> and merging on <span class="mono">service_request_id</span> touches only new or mutated rows each run.</p>
       </div>
-      <div class="card accent">
-        <h3>Why two <span class="mono">.yml</span> files?</h3>
-        <p><b><span class="mono">_bronze__sources.yml</span></b> — describes the <b>raw warehouse data</b>:
-           declares the source, checks <b>freshness</b> (warn 36h / error 72h), and tests
-           <span class="mono">unique</span> + <span class="mono">not_null</span> on the key.</p>
-        <p style="margin-top:10px"><b><span class="mono">_bronze__models.yml</span></b> — describes the <b>models we build in dbt</b>.</p>
-        <p class="muted" style="margin-top:10px">Keeping "raw inputs" and "our models" in separate files makes each one
-           <b>easier to scan</b> and reason about.</p>
+      <div class="card">
+        <h3><span class="lbl gold">Gold</span> — why marts are tables?</h3>
+        <p class="muted">Marts are small aggregates (counts &amp; rates). Full rebuild each run is cheap and keeps them consistent — incremental logic would add complexity with no benefit.</p>
       </div>
     </div>
-  </section>
-
-  <!-- 4 SILVER -->
-  <section class="slide">
-    <h2 class="title"><span class="lbl silver">Silver</span> &nbsp;Layer — Clean &amp; Enrich</h2>
-    <p class="sub">Materialized as <b>views</b>. Two steps: standardize, then derive.</p>
-    <div class="grid g2" style="margin-top:14px">
-      <div class="card">
-        <div class="band silver"><span class="lbl silver">Step 1 · Cleaned</span></div>
-        <h3 style="margin-top:6px">int_service_requests__cleaned.sql</h3>
-        <ul class="clean">
-          <li>Replaces junk / sentinel values (<span class="mono">''</span>, <i>Unspecified</i>, <i>N/A</i>, <i>Unknown</i>) with <b>NULL</b>.</li>
-          <li><b>Standardizes</b> controlled vocabularies to canonical UPPER (e.g. borough → <span class="mono">MANHATTAN</span>, with park-borough fallback).</li>
-          <li>Enforces structure: drops <b>invalid ZIPs</b> (non 5-digit) and <b>out-of-box coordinates</b> (NYC bounding box).</li>
-        </ul>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="card hi">
+        <h3>Macro — <span class="mono">clean_sentinel</span></h3>
+        <p class="muted">NYC 311 uses placeholders for "no value" that aren't NULL:</p>
+        <p style="margin-top:6px"><code>''</code> &ensp;<code>Unspecified</code> &ensp;<code>N/A</code> &ensp;<code>0 Unspecified</code> &ensp;<code>Unknown</code></p>
+        <p class="muted" style="margin-top:6px">One macro trims whitespace and collapses all of them to NULL — called on many columns in silver. Write once, apply everywhere.</p>
       </div>
       <div class="card">
-        <div class="band silver"><span class="lbl silver">Step 2 · Enriched</span></div>
-        <h3 style="margin-top:6px">int_service_requests__enriched.sql</h3>
+        <h3>Seeds — version-controlled reference lists</h3>
         <ul class="clean">
-          <li>Adds <b>derived columns</b>: <span class="mono">resolution_time_hours</span>,
-              <span class="mono">is_closed</span>, <span class="mono">is_overdue</span>, <span class="mono">is_resolved_on_time</span>.</li>
-          <li>Flattens <b>date parts</b> from created_at (year, quarter, month, day-of-week, weekend flag, hour).</li>
-          <li>Guards against bad data — negative durations (closed before created) → NULL.</li>
+          <li><span class="mono">seed_agency_codes</span> — flag unexpected agencies</li>
+          <li><span class="mono">seed_location_types</span> — flag unexpected location types</li>
+          <li><span class="mono">seed_expected_source_columns</span> — <b>schema-drift contract</b></li>
         </ul>
       </div>
     </div>
-    <div class="note" style="margin-top:16px">
-      Output = the <b>conformed, analytics-ready grain</b> (one clean row per request) that all of gold is built from.
+    <div class="card" style="height:100%">
+      <h3>Tests</h3>
+      <ul class="clean">
+        <li><b>unique + not_null</b> on all keys</li>
+        <li><b>accepted_values</b> — borough &amp; channel (<span style="color:var(--red)">error</span>); status &amp; facility (<span style="color:var(--accent)">warn</span>)</li>
+        <li><b>relationships → seeds</b> for agency &amp; location type</li>
+        <li><b>regex / range</b> — ZIP, BBL, lat/long bounding box</li>
+        <li><b>expression_is_true</b> — closed ≥ created, created not in future</li>
+        <li><b>Schema-drift guard</b> — compares live warehouse columns vs. seed manifest; flags MISSING and NEW columns</li>
+      </ul>
+      <p class="muted" style="margin-top:8px;font-size:12px">Failing rows persist to <span class="mono">*_DQ_FAILURES</span> schema for triage.</p>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- 4 GOLD -->
-  <section class="slide">
-    <h2 class="title"><span class="lbl gold">Gold</span> &nbsp;Layer — Analytics Models</h2>
-    <div class="grid g3" style="margin-top:14px">
-      <div class="card">
-        <h3><span class="lbl gold">Dimension</span></h3>
-        <p class="tag" style="margin:4px 0 10px">table</p>
-        <p><b>dim_date</b> — a gap-free calendar spine (weekend/month/quarter attributes) for time-intelligence and zero-activity days. Joined to the fact via <span class="mono">created_date_sk</span>.</p>
-      </div>
-      <div class="card accent">
-        <h3><span class="lbl gold">Fact</span></h3>
-        <p class="tag pill-orange" style="margin:4px 0 10px">incremental · merge</p>
-        <p><b>fct_service_requests</b> — wide, one row per request. Descriptive attributes are <b>degenerate dimensions</b> on the fact itself (no needless star joins).</p>
-      </div>
-      <div class="card">
-        <h3><span class="lbl gold">Marts</span></h3>
-        <p class="tag" style="margin:4px 0 10px">table (full rebuild)</p>
-        <p>Aggregated, BI-facing tables: daily volume by borough/agency, SLA/resolution performance, open-vs-closed backlog.</p>
-      </div>
-    </div>
-    <div class="grid g2" style="margin-top:16px">
-      <div class="card">
-        <h3>Why the fact is <span style="color:var(--accent)">incremental</span></h3>
-        <p>It's the <b>largest table</b> (tens of millions of rows). Rebuilding it daily is wasteful. Filtering on
-           <span class="mono">ingested_at &gt; max(ingested_at)</span> and <b>merging on</b> <span class="mono">service_request_id</span> means
-           each run touches only <b>new or mutated</b> rows (status flips, late closures from the overlap reload) and updates them in place.</p>
-      </div>
-      <div class="card">
-        <h3>Why marts are <span style="color:var(--gold)">not</span> incremental</h3>
-        <p>Marts are small <b>aggregates</b> (grouped counts &amp; rates) that read from the fact. They're cheap to
-           <b>rebuild fully</b> every run, which keeps them always-consistent and avoids the complexity of incremental
-           merge logic where it buys nothing.</p>
-      </div>
-    </div>
-  </section>
+<!-- ⑧ DBT IN ACTION -->
+<section class="slide">
+  <div class="kicker">Step 4 · Live</div>
+  <h2 class="title">dbt Cloud — Airflow-triggered runs</h2>
+  <p class="sub">Each successful dlt load triggers a dbt Cloud job via the Airflow Dataset hand-off.</p>
+  <div class="img-wrap" style="margin-top:14px;flex:1;display:flex;align-items:center;">
+    <img src="dbt_airflow_runs.png" class="screenshot" style="max-height:100%;object-fit:contain;width:100%;" alt="dbt Cloud run history — Airflow triggered" />
+  </div>
+  <p class="img-caption" style="margin-top:8px">dbt Cloud — run history showing Airflow-triggered prod builds on the <span class="mono">main</span> branch · all green</p>
+</section>
 
-  <!-- 4 MACRO -->
-  <section class="slide">
-    <h2 class="title"><span class="num">4</span>Macro — <span class="mono">clean_sentinel</span></h2>
-    <p class="sub">One macro, reused across many silver columns — DRY data cleaning.</p>
-    <div class="grid g2" style="margin-top:14px">
-      <div class="card">
-        <h3>The problem</h3>
-        <p>NYC 311 uses several placeholders that <b>mean "no value" but are not NULL</b>:</p>
-        <p style="margin-top:8px">
-          <span class="tag">''</span> <span class="tag">Unspecified</span>
-          <span class="tag">N/A</span> <span class="tag">0 Unspecified</span> <span class="tag">Unknown</span>
-        </p>
-        <p style="margin-top:12px">If left as-is, every downstream model and test has to special-case them.</p>
-      </div>
-      <div class="card accent">
-        <h3>The solution</h3>
-        <p>A macro that expands into a chunk of SQL: it <b>trims whitespace</b> and
-           <b>collapses all placeholders to NULL</b>, so everything downstream treats "missing" consistently.</p>
-        <p style="margin-top:8px">Called on <b>many columns</b> in the cleaned model — write the logic once, apply it everywhere.</p>
-      </div>
-    </div>
-    <pre style="margin-top:14px"><span class="k">{% macro</span> <span class="f">clean_sentinel</span>(column) <span class="k">%}</span>
-    nullif(nullif(nullif(nullif(nullif(
-        trim({{ column }}), <span class="s">''</span>),
-        <span class="s">'Unspecified'</span>), <span class="s">'N/A'</span>), <span class="s">'0 Unspecified'</span>), <span class="s">'Unknown'</span>)
-<span class="k">{% endmacro %}</span>
-
-<span class="c">-- usage in silver:</span>
-upper({{ clean_sentinel(<span class="s">'borough'</span>) }})  <span class="k">as</span> borough</pre>
-  </section>
-
-  <!-- 4 SEEDS -->
-  <section class="slide">
-    <h2 class="title"><span class="num">4</span>Seeds — Version-Controlled Reference Lists</h2>
-    <p class="sub">Plain CSV files dbt loads into Snowflake as small tables (<span class="mono">dbt seed</span>).</p>
-    <div class="grid g3" style="margin-top:16px">
-      <div class="card">
-        <h3 class="mono" style="font-size:15px">seed_agency_codes.csv</h3>
-        <p>Allowed NYC agency acronyms. Used by a warn-severity <b>relationships</b> test to flag unexpected agencies.</p>
-      </div>
-      <div class="card">
-        <h3 class="mono" style="font-size:15px">seed_location_types.csv</h3>
-        <p>Allowed location-type values. Same idea — surfaces values outside the known set without blocking the build.</p>
-      </div>
-      <div class="card accent">
-        <h3 class="mono" style="font-size:15px">seed_expected_source_columns.csv</h3>
-        <p>The list of columns the raw table <b>should</b> have — the contract used to <b>detect if the API changes its schema</b>.</p>
-      </div>
-    </div>
-    <div class="note" style="margin-top:18px">
-      <b>Why seeds?</b> Reference lists that rarely change live better as <b>version-controlled CSVs</b>
-      (reviewable in Git, reusable across tests) than as values hard-coded inside SQL.
-    </div>
-  </section>
-
-  <!-- 4 TESTS -->
-  <section class="slide">
-    <h2 class="title"><span class="num">4</span>Data Quality — Tests</h2>
-    <p class="sub">Layered tests run as part of <span class="mono">dbt build</span>; failing rows persist to a <span class="mono">*_DQ_FAILURES</span> schema for triage.</p>
-    <div class="grid g2" style="margin-top:12px">
-      <div class="card">
-        <h3>Generic &amp; integrity tests <span class="tag" style="margin-left:6px">integrity</span></h3>
+<!-- ⑨ POWER BI -->
+<section class="slide">
+  <div class="kicker">Step 5</div>
+  <h2 class="title">Power BI — Visualization</h2>
+  <div class="split split-40" style="margin-top:12px;flex:1;align-items:start;gap:18px">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="card hi">
+        <h3>Setup</h3>
         <ul class="clean">
-          <li><b>unique</b> + <b>not_null</b> on keys (source &amp; every grain).</li>
-          <li><b>accepted_values</b> — borough &amp; channel (<span style="color:var(--red)">error</span>); status &amp; facility (<span style="color:var(--accent)">warn</span>, evolving sets).</li>
-          <li><b>relationships</b> → seeds for agency &amp; location type.</li>
-          <li><b>regex / range</b> (dbt_expectations) — ZIP, BBL, lat/long bounding box.</li>
-          <li><b>expression_is_true</b> — business rules: closed ≥ created, created not in future, due ≥ created.</li>
+          <li>Connected <b>Power BI Desktop</b> to the Snowflake gold layer</li>
+          <li>Built visuals: volume trends, borough breakdown, complaint types, SLA metrics</li>
+          <li>Published to <b>Power BI Service</b></li>
+          <li>Set Snowflake data source credentials in the Service</li>
+          <li>Scheduled <b>daily refresh</b></li>
         </ul>
       </div>
-      <div class="card accent">
-        <h3>Schema-drift guard <span class="tag" style="margin-left:6px">drift</span></h3>
-        <p><span class="mono">assert_source_schema_unchanged.sql</span> compares the <b>live</b> warehouse columns
-           against <span class="mono">seed_expected_source_columns</span> and flags:</p>
-        <ul class="clean">
-          <li><b>MISSING/RENAMED</b> — an expected column disappeared upstream.</li>
-          <li><b>NEW/UNMAPPED</b> — the API added a field we haven't mapped yet.</li>
-        </ul>
-        <p class="muted" style="margin-top:8px">Severity <b>warn</b>, so a schema change surfaces without halting production loads.</p>
-      </div>
-    </div>
-    <div class="note" style="margin-top:14px">
-      Severity is deliberate: <b>structural / closed-set violations error</b> (block bad data);
-      <b>evolving or known-artifact issues warn</b> (surface, don't block).
-    </div>
-  </section>
-
-  <!-- 5 — POWER BI -->
-  <section class="slide">
-    <h2 class="title"><span class="num">5</span>Power BI — Visualization</h2>
-    <p class="sub">The gold layer is the serving contract; Power BI reads it directly.</p>
-    <div class="flow" style="margin-top:18px">
-      <div class="node"><div class="t">Connect</div><div class="d">Power BI Desktop → Snowflake (gold)</div></div>
-      <div class="arrow">→</div>
-      <div class="node"><div class="t">Build</div><div class="d">visuals &amp; report pages</div></div>
-      <div class="arrow">→</div>
-      <div class="node"><div class="t">Publish</div><div class="d">to Power BI Service (app)</div></div>
-      <div class="arrow">→</div>
-      <div class="node"><div class="t">Credentials</div><div class="d">set Snowflake creds in Service</div></div>
-      <div class="arrow">→</div>
-      <div class="node"><div class="t">Refresh</div><div class="d">scheduled daily</div></div>
-    </div>
-    <div class="grid g2" style="margin-top:22px">
       <div class="card">
-        <h3>Steps</h3>
-        <ul class="clean">
-          <li>Loaded data from the <b>Snowflake account</b> (gold marts &amp; fact) in <b>Power BI Desktop</b>.</li>
-          <li>Created the <b>visualizations</b> (volume, SLA performance, open-vs-closed backlog by borough/agency).</li>
-          <li><b>Published</b> the report to the Power BI <b>app / Service</b>.</li>
-          <li>In the Service, set the <b>data source credentials</b> for the Snowflake connection.</li>
-          <li><b>Scheduled a daily refresh</b> so the report tracks each new load.</li>
-        </ul>
-      </div>
-      <div class="card accent">
         <h3>Why this layering works</h3>
-        <p>Power BI never touches raw data or transformation logic — it consumes
-           <b>clean, tested, aggregated gold tables</b>. All business logic stays in dbt
-           (versioned, tested), keeping the BI layer thin and the metrics consistent.</p>
-        <p class="muted" style="margin-top:10px">(The earlier Evidence.dev BI layer was retired in favor of Power BI.)</p>
+        <p class="muted">Power BI consumes <b>clean, tested, aggregated gold tables</b>. All business logic lives in dbt (versioned, tested) — the BI layer stays thin and metrics stay consistent.</p>
       </div>
     </div>
-  </section>
-
-  <!-- 6 — LIMITATION -->
-  <section class="slide">
-    <h2 class="title"><span class="num">6</span>Known Limitation — The Overlap Window</h2>
-    <div class="warn" style="margin-top:14px">
-      The daily incremental load filters the source by <b>created_date</b> with a <b>3-day overlap window</b>.
-      Requests updated <b>within</b> those 3 days are re-merged correctly — but requests <b>created earlier</b>
-      whose status later changes are <b>missed</b>.
+    <div style="display:flex;flex-direction:column;gap:10px;flex:1">
+      <div class="img-wrap">
+        <img src="nycdataviz_1.png" class="screenshot" alt="Power BI dashboard - NYC 311 overview" />
+      </div>
+      <div class="img-wrap">
+        <img src="nycdataviz_2.png" class="screenshot" alt="Power BI dashboard - NYC 311 detail" />
+      </div>
+      <p class="img-caption">Power BI Service — 21M+ requests · daily trend · by borough &amp; complaint type</p>
     </div>
-    <div class="grid g2" style="margin-top:18px">
+  </div>
+</section>
+
+<!-- ⑩ LIMITATION + SUMMARY -->
+<section class="slide">
+  <div class="kicker">Step 6 · Known limitation</div>
+  <h2 class="title">Limitation &amp; Summary</h2>
+  <div class="split split-50" style="margin-top:14px;align-items:start;gap:16px">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="warn">
+        <b>The overlap window gap</b><br/>
+        Data is loaded filtered by <b>created_date</b> with a 3-day overlap. Requests updated within those 3 days are re-merged correctly — but requests created earlier whose status later changes are <b>missed</b>.
+      </div>
       <div class="card">
         <h3>Why it happens</h3>
-        <p>We page the API on <b>created_date</b> (an immutable field, ideal for windowing). But a 311 request can be
-           <b>updated long after it's created</b> — e.g. a complaint opened in January and closed in June.</p>
-        <p style="margin-top:8px">The 3-day overlap only re-pulls recently <i>created</i> rows, so a status change on an
-           <b>old</b> request falls outside the window and isn't re-merged.</p>
+        <p class="muted">Windowing on <span class="mono">created_date</span> is efficient, but a 311 request can be updated long after creation (e.g. opened in January, closed in June). Those late mutations fall outside the window.</p>
       </div>
       <div class="card">
         <h3>Possible mitigations</h3>
         <ul class="clean">
-          <li>Window (or add a second pass) on <span class="mono">resolution_action_updated_date</span> to catch mutations regardless of creation date.</li>
-          <li>Widen the overlap window (trades freshness lag for cost).</li>
-          <li>Periodic <b>reconciliation backfill</b> of open/recent requests.</li>
+          <li>Add a second pass on <span class="mono">resolution_action_updated_date</span></li>
+          <li>Widen the overlap window (cost vs. freshness trade-off)</li>
+          <li>Periodic reconciliation backfill of open requests</li>
         </ul>
-        <p class="muted" style="margin-top:8px">A deliberate trade-off today: cheap, fast daily loads vs. perfect late-update capture.</p>
       </div>
     </div>
-  </section>
-
-  <!-- CLOSING -->
-  <section class="slide">
-    <div class="hero">
-      <div class="kicker">Summary</div>
-      <h1 style="font-size:46px">One pipeline, clean handoffs</h1>
-      <div class="flow" style="margin-top:26px;width:100%">
-        <div class="node"><div class="t">Socrata API</div><div class="d">paged JSON</div></div><div class="arrow">→</div>
-        <div class="node"><div class="t">dlt</div><div class="d">extract · merge</div></div><div class="arrow">→</div>
-        <div class="node"><div class="t">Snowflake</div><div class="d">raw landing</div></div><div class="arrow">→</div>
-        <div class="node"><div class="t">dbt</div><div class="d">bronze→silver→gold</div></div><div class="arrow">→</div>
-        <div class="node"><div class="t">Power BI</div><div class="d">daily refresh</div></div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="card hi">
+        <h3>Pipeline summary</h3>
+        <div class="flow" style="margin:8px 0 12px">
+          <div class="node"><div class="t" style="font-size:12px">Socrata API</div></div><div class="arrow">→</div>
+          <div class="node"><div class="t" style="font-size:12px">dlt</div></div><div class="arrow">→</div>
+          <div class="node"><div class="t" style="font-size:12px">Snowflake</div></div><div class="arrow">→</div>
+          <div class="node"><div class="t" style="font-size:12px">dbt</div></div><div class="arrow">→</div>
+          <div class="node"><div class="t" style="font-size:12px">Power BI</div></div>
+        </div>
+        <ul class="clean">
+          <li><span class="ok">✓</span> Incremental &amp; merge-based loading</li>
+          <li><span class="ok">✓</span> Event-driven orchestration (Airflow Dataset)</li>
+          <li><span class="ok">✓</span> Dev / Prod environment isolation</li>
+          <li><span class="ok">✓</span> Tested, schema-drift guarded</li>
+          <li><span class="ok">✓</span> Daily refresh end-to-end</li>
+        </ul>
       </div>
-      <p class="sub" style="margin-top:26px;max-width:760px">
-        <b>Airflow</b> orchestrates throughout — daily incremental loads, a dataset-triggered dbt Cloud build,
-        and tested, versioned transformations feeding a thin BI layer.
-      </p>
-      <div class="chips" style="margin-top:24px">
-        <span class="chip">Incremental &amp; merge-based</span>
-        <span class="chip">Tested &amp; schema-drift guarded</span>
-        <span class="chip">Dev / Prod isolated</span>
-        <span class="chip">Event-driven orchestration</span>
-      </div>
-      <p class="sub" style="margin-top:34px">Thank you — questions welcome.</p>
+      <p class="sub" style="text-align:center;margin-top:8px">Thank you — questions welcome.</p>
     </div>
-  </section>
+  </div>
+</section>
 
 </div>
 
 <div class="brand"><b>NYC 311</b> · dlt · Airflow · Snowflake · dbt · Power BI</div>
 <div class="chrome">
-  <button id="prev" title="Previous (←)">‹</button>
+  <button id="prev" title="← Previous">‹</button>
   <span id="counter">1 / 1</span>
-  <button id="next" title="Next (→)">›</button>
+  <button id="next" title="Next →">›</button>
 </div>
 
 <script>
@@ -636,10 +462,10 @@ upper({{ clean_sentinel(<span class="s">'borough'</span>) }})  <span class="k">a
   document.addEventListener('keydown',e=>{
     if(['ArrowRight','PageDown',' '].includes(e.key)){e.preventDefault();show(i+1);}
     else if(['ArrowLeft','PageUp'].includes(e.key)){e.preventDefault();show(i-1);}
-    else if(e.key==='Home'){show(0);} else if(e.key==='End'){show(slides.length-1);}
+    else if(e.key==='Home'){show(0);}
+    else if(e.key==='End'){show(slides.length-1);}
     else if(e.key==='f'||e.key==='F'){document.documentElement.requestFullscreen?.();}
   });
-  // touch swipe
   let x0=null;
   addEventListener('touchstart',e=>x0=e.touches[0].clientX);
   addEventListener('touchend',e=>{if(x0===null)return;const dx=e.changedTouches[0].clientX-x0;if(Math.abs(dx)>50)show(i+(dx<0?1:-1));x0=null;});
